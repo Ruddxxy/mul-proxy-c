@@ -61,7 +61,8 @@ int main() {
 
     printf("[INFO] Listening on port %d\n", PORT);
 
-    while (1) {
+    int running = 1;
+    while (running) {
         new_socket = accept(server_fd, (struct sockaddr*)&address, &addrlen);
         if (new_socket == INVALID_SOCKET) {
             printf("Accept failed. Error Code: %d\n", WSAGetLastError());
@@ -71,7 +72,6 @@ int main() {
         printf("[INFO] Connection accepted from %s:%d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));  // Log the client's IP address and port
         total_requests++; // Increment the total requests count
         printf("[INFO] Total requests handled: %d\n", total_requests); // Log the total requests count
-
 
         printf("[INFO] Accepted connection\n");
 
@@ -90,31 +90,29 @@ int main() {
             char *host = parse_host(buffer);
             if (host) {
                 if (strstr(host, "localhost") || strstr(host, "127.0.1") || strstr(host, "192.168") || strstr(host, "10.")) {
-                printf("[SECURITY] Request to localhost or private IP detected. Closing Connection.\n");
-                closesocket(new_socket);
-                continue;
-            }
-
-
+                    printf("[SECURITY] Request to localhost or private IP detected. Closing Connection.\n");
+                    closesocket(new_socket);
+                    continue;
+                }
                 printf("[INFO]Fowarding to host: %s\n", host);
                 forward_request(host,buffer, new_socket);
+                printf("[INFO] Total requests handled: %d\n", total_requests); // Log the total requests count
                 continue;
-                 // Forward the request to the target host
             } else {
                 printf("[ERROR] Could not parse host Header.\n");
+            }
         }
-        printf("[INFO] Total requests handled: %d\n", total_requests); // Log the total requests count
-        } 
+        closesocket(new_socket); // Properly close the socket after handling the request
+        // Optionally, add a condition to break the loop, e.g., on a special request or signal
+        // if (some_exit_condition) running = 0;
     }
 
-        closesocket(new_socket);
-
-            // Cleanup
+    // Cleanup
     closesocket(server_fd);
     WSACleanup();
     return 0;
-        
 }
+
 char *parse_host(char *request){
     static char hostname[256];
     char *host_line = strstr(request, "Host:");
@@ -129,33 +127,30 @@ int forward_request(char *hostname, char *client_request, SOCKET client_socket) 
     SOCKET server_socket;
     struct sockaddr_in server_addr;
     struct hostent *he;
+send(server_socket, client_request, strlen(client_request), 0);
 
     if((he = gethostbyname(hostname)) == NULL) {  // It uses the `gethostbyname` function to resolve the hostname and establishes a connection to the server.
         printf("gethostbyname failed for the host: %s\n", hostname);
         return -1;
     }
 
-server_socket = socket(AF_INET, SOCK_STREAM, 0);
-if (server_socket == INVALID_SOCKET) {
-    printf("Socket creation failed. Error Code: %d\n", WSAGetLastError());
-    return -1;
-}
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == INVALID_SOCKET) {
+        printf("Socket creation failed. Error Code: %d\n", WSAGetLastError());
+        return -1;
+    }
 
-memset(&server_addr, 0, sizeof(server_addr));
-server_addr.sin_family = AF_INET;
-server_addr.sin_port = htons(80);
-memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(80);
+    memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
 
-if(connect(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr))<0){
-    printf("Connection to server failed. Error Code: %d\n", WSAGetLastError());
-    closesocket(server_socket);
-    return -1;
-}
-if(connect(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-    printf("Connection to server failed. Error Code: %d\n", WSAGetLastError());
-    closesocket(server_socket);
-    return -1;
-}
+    if(connect(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr))<0){
+        printf("Connection to server failed. Error Code: %d\n", WSAGetLastError());
+        closesocket(server_socket);
+        return -1;
+    }
+
 send(server_socket, client_request, strlen(client_request), 0);
 
 char buffer[BUFFER_SIZE];

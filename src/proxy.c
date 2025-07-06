@@ -5,12 +5,13 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 
+
 #define PORT 8080
 #define BUFFER_SIZE 4096
 
-    char *parse_host(char *request);
-    int forward_request(char *hostname, char *client_request, SOCKET client_socket);
-    int total_requests = 0; // Global variable to count total requests
+char *parse_host(char *request);
+int forward_request(char *hostname, char *client_request, SOCKET client_socket);
+
 int main() {
     WSADATA wsa;
     SOCKET server_fd, new_socket;
@@ -18,7 +19,7 @@ int main() {
     int opt = 1;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
-
+    int total_requests = 0; // Initialize total requests count
 
     // Initialize Winsock
     if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
@@ -70,55 +71,55 @@ int main() {
         printf("[INFO] Connection accepted from %s:%d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));  // Log the client's IP address and port
         total_requests++; // Increment the total requests count
         printf("[INFO] Total requests handled: %d\n", total_requests); // Log the total requests count
+
+
         printf("[INFO] Accepted connection\n");
 
         int bytes = recv(new_socket, buffer, BUFFER_SIZE - 1, 0);
         if (bytes > 0) {
             buffer[bytes] = '\0';
             printf("[RECV]\n%s\n", buffer);
-           
-            // Check if the request is empty
-            if (bytes == 0) {
-                printf("[ERROR] Received empty request.\n");
-                closesocket(new_socket);
-                continue;
-            }
+
             // Limit the request size to prevent buffer overflow
-            if (bytes >= BUFFER_SIZE) {
+            if (bytes >= BUFFER_SIZE -1) {
                 printf("[SECURITY] Request too large.Closing Connection.\n");
                 closesocket(new_socket);
                 continue;
             }
-
             //parse the host header
             char *host = parse_host(buffer);
-            if (strstr(host, "localhost") || strstr(host, "127.0.1") || strstr(host, "192.168") || strstr(host, "10.")) {
+            if (host) {
+                if (strstr(host, "localhost") || strstr(host, "127.0.1") || strstr(host, "192.168") || strstr(host, "10.")) {
                 printf("[SECURITY] Request to localhost or private IP detected. Closing Connection.\n");
                 closesocket(new_socket);
                 continue;
             }
-            if (host) {
+
+
                 printf("[INFO]Fowarding to host: %s\n", host);
                 forward_request(host,buffer, new_socket);
-                printf("[INFO] proxying request to %s\n", host); // Forward the request to the target host
+                continue;
+                 // Forward the request to the target host
             } else {
                 printf("[ERROR] Could not parse host Header.\n");
         }
+        printf("[INFO] Total requests handled: %d\n", total_requests); // Log the total requests count
+        } 
     }
 
         closesocket(new_socket);
-    }
 
-    // Cleanup
+            // Cleanup
     closesocket(server_fd);
     WSACleanup();
     return 0;
+        
 }
 char *parse_host(char *request){
     static char hostname[256];
     char *host_line = strstr(request, "Host:");
     if(host_line){
-        scanf(host_line, "Host: %255s", hostname);
+        sscanf(host_line, "Host: %255s", hostname);
         return hostname;
     }
     return NULL;
@@ -150,19 +151,22 @@ if(connect(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr))<0
     closesocket(server_socket);
     return -1;
 }
-
+if(connect(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    printf("Connection to server failed. Error Code: %d\n", WSAGetLastError());
+    closesocket(server_socket);
+    return -1;
+}
 send(server_socket, client_request, strlen(client_request), 0);
 
 char buffer[BUFFER_SIZE];
 int bytes;
-while((bytes = recv(server_socket, buffer, BUFFER_SIZE, 0)) > 0){
+while ((bytes = recv(server_socket, buffer, BUFFER_SIZE, 0)) > 0){
     send(client_socket, buffer, bytes, 0);
 }
 
 closesocket(server_socket);
 memset(buffer, 0, BUFFER_SIZE); //zeroing out the buffer
 printf("[INFO] Request forwarded to %s\n", hostname);
-closesocket(client_socket); 
 return 0;
 }   
 

@@ -3,11 +3,13 @@
 #include <string.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-
-#pragma comment(lib, "Ws2_32.lib")
+#include <windows.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 4096
+
+    char *parse_host(char *request);
+    int forward_request(char *hostname, char *client_request, SOCKET client_socket);
 
 int main() {
     WSADATA wsa;
@@ -16,6 +18,7 @@ int main() {
     int opt = 1;
     int addrlen = sizeof(address);
     char buffer[BUFFER_SIZE];
+
 
     // Initialize Winsock
     if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
@@ -70,7 +73,17 @@ int main() {
         if (bytes > 0) {
             buffer[bytes] = '\0';
             printf("[RECV]\n%s\n", buffer);
+
+            //parse the host header
+            char *host = parse_host(buffer);
+            if (host) {
+                printf("[INFO]Fowarding to host: %s\n", host);
+                // Here you would typically forward the request to the target host
+                forward_request(host,buffer, new_socket);
+            } else {
+                printf("[ERROR] Could not parse host Header.\n");
         }
+    }
 
         closesocket(new_socket);
     }
@@ -80,5 +93,56 @@ int main() {
     WSACleanup();
     return 0;
 }
+char *parse_host(char *request){
+    static char hostname[256];
+    char *host_line = strstr(request, "Host:");
+    if(host_line){
+        scanf(host_line, "Host: %255s", hostname);
+        return hostname;
+    }
+    return NULL;
+    }
+// This function forwards the request to the specified hostname and sends the response back to the client.
+int forward_request(char *hostname, char *client_request, SOCKET client_socket) {
+    SOCKET server_socket;
+    struct sockaddr_in server_addr;
+    struct hostent *he;
+
+    if((he = gethostbyname(hostname)) == NULL) {  // It uses the `gethostbyname` function to resolve the hostname and establishes a connection to the server.
+        printf("gethostbyname failed for the host: %s\n", hostname);
+        return -1;
+    }
+
+server_socket = socket(AF_INET, SOCK_STREAM, 0);
+if (server_socket == INVALID_SOCKET) {
+    printf("Socket creation failed. Error Code: %d\n", WSAGetLastError());
+    return -1;
+}
+
+memset(&server_addr, 0, sizeof(server_addr));
+server_addr.sin_family = AF_INET;
+server_addr.sin_port = htons(80);
+memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
+
+if(connect(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr))<0){
+    printf("Connection to server failed. Error Code: %d\n", WSAGetLastError());
+    closesocket(server_socket);
+    return -1;
+}
+
+send(server_socket, client_request, strlen(client_request), 0);
+
+char buffer[BUFFER_SIZE];
+int bytes;
+while((bytes = recv(server_socket, buffer, BUFFER_SIZE, 0)) > 0){
+    send(client_socket, buffer, bytes, 0);
+}
+
+closesocket(server_socket);
+closesocket(client_socket); 
+return 0;
+}   
+
 // This code implements a simple TCP proxy server in C using Winsock on Windows.
 // It listens on a specified port, accepts incoming connections, and receives data from clients.
+// The function returns 0 on success and -1 on failure.

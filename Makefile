@@ -4,7 +4,7 @@ CFLAGS = -Wall -Wextra -O2
 LIBS = -lws2_32
 
 # Target executable
-TARGET = proxy
+TARGET = proxy.exe
 
 # Source files
 SRC = src/proxy.c
@@ -18,4 +18,4 @@ $(TARGET): $(SRC)
 
 # Clean up build artifacts
 clean:
-	rm -f $(TARGET)
+	@if exist $(TARGET) del /Q $(TARGET)

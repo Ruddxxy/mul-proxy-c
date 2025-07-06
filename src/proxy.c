@@ -124,10 +124,10 @@ char *parse_host(char *request){
     }
 // This function forwards the request to the specified hostname and sends the response back to the client.
 int forward_request(char *hostname, char *client_request, SOCKET client_socket) {
+
     SOCKET server_socket;
     struct sockaddr_in server_addr;
     struct hostent *he;
-send(server_socket, client_request, strlen(client_request), 0);
 
     if((he = gethostbyname(hostname)) == NULL) {  // It uses the `gethostbyname` function to resolve the hostname and establishes a connection to the server.
         printf("gethostbyname failed for the host: %s\n", hostname);
@@ -151,7 +151,7 @@ send(server_socket, client_request, strlen(client_request), 0);
         return -1;
     }
 
-send(server_socket, client_request, strlen(client_request), 0);
+    send(server_socket, client_request, strlen(client_request), 0);
 
 char buffer[BUFFER_SIZE];
 int bytes;

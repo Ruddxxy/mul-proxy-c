@@ -73,12 +73,23 @@ int main() {
         total_requests++; // Increment the total requests count
         printf("[INFO] Total requests handled: %d\n", total_requests); // Log the total requests count
 
-        printf("[INFO] Accepted connection\n");
-
         int bytes = recv(new_socket, buffer, BUFFER_SIZE - 1, 0);
         if (bytes > 0) {
             buffer[bytes] = '\0';
             printf("[RECV]\n%s\n", buffer);
+
+            if(strncmp(buffer, "CONNECT", 7) == 0){
+                printf("[INFO] CONNECT request received. This is not supported in this proxy.\n");
+                //closesocket(new_socket);
+                //continue; // Skip further processing for CONNECT requests
+            } else if (strncmp(buffer, "GET", 3) ==0){
+                printf("[INFO] GET request received.\n");
+            }else if (strncmp(buffer, "POST", 4) == 0) {
+                printf("[INFO] POST request received.\n");
+            } else {
+                printf("[INFO] Other request type received.\n");
+            }
+            
 
             // Limit the request size to prevent buffer overflow
             if (bytes >= BUFFER_SIZE -1) {
@@ -95,9 +106,7 @@ int main() {
                     continue;
                 }
                 printf("[INFO]Fowarding to host: %s\n", host);
-                forward_request(host,buffer, new_socket);
-                printf("[INFO] Total requests handled: %d\n", total_requests); // Log the total requests count
-                continue;
+                forward_request(host, buffer, new_socket);
             } else {
                 printf("[ERROR] Could not parse host Header.\n");
             }
